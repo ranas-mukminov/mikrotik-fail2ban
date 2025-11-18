@@ -20,11 +20,10 @@ RUN mkdir -p /data/filter.d /data/jail.d /data/action.d
 COPY fail2ban/filter.d/*.conf /etc/fail2ban/filter.d/
 COPY fail2ban/jail.d/*.conf /etc/fail2ban/jail.d/
 
-# Disable default Debian jails that might cause issues in Docker
-# We only want our custom MikroTik jails to run
-RUN echo '[DEFAULT]\nenabled = false' > /etc/fail2ban/jail.d/00-disable-defaults.conf
+# Copy jail.local to disable default Debian jails
+COPY docker/jail.local /etc/fail2ban/jail.local
 
-# Copy entrypoint script
+# Copy and set up entrypoint script
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

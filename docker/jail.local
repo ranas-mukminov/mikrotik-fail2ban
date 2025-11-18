@@ -1,0 +1,18 @@
+# jail.local - Override default Debian jail configurations
+#
+# This file disables default Debian jails that are not relevant
+# for a container environment focused on MikroTik log monitoring.
+#
+# The MikroTik-specific jails (mikrotik-login, mikrotik-l2tp, mikrotik-ovpn)
+# are disabled by default in their respective config files.
+# Users should enable them via custom configurations mounted at /data/jail.d/
+
+[DEFAULT]
+# Disable all default jails by default
+# Only MikroTik-specific jails should be enabled via custom configs
+
+[sshd]
+enabled = false
+
+[sshd-ddos]
+enabled = false

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-echo "Starting mikrotik-fail2ban Docker container..."
+echo "=== MikroTik Fail2Ban Container Starting ==="
 
 # Copy custom configurations if provided
 if [ -d /data/filter.d ] && [ "$(ls -A /data/filter.d 2>/dev/null)" ]; then
@@ -22,19 +22,24 @@ fi
 # Create necessary directories
 mkdir -p /var/run/fail2ban /var/log
 
-# Touch log files that might be needed by jails
+# Create dummy log files for fail2ban jails that might reference them
+# This prevents errors even if jails are disabled
 touch /var/log/auth.log /var/log/syslog /var/log/messages
 
-# Start rsyslog for log collection (suppress kernel log error)
+# Start rsyslog for log collection (suppress kernel log warnings)
+# Note: rsyslogd may fail in some container environments (e.g., restricted capabilities)
+# This is acceptable as fail2ban can work without it if logs are provided externally
 echo "Starting rsyslog..."
-rsyslogd -n >/dev/null 2>&1 &
-
-# Give rsyslog a moment to start
-sleep 1
+if ! rsyslogd 2>/dev/null; then
+    echo "Warning: rsyslogd failed to start (this is OK if logs are provided externally)"
+fi
 
 echo "Starting fail2ban-server in foreground..."
-# Start Fail2Ban in foreground with:
-# -f: foreground mode
-# -x: force execution (don't check for running instance)
-# -v: verbose logging
+echo "Fail2Ban will monitor MikroTik logs configured in /etc/fail2ban/jail.d/"
+echo ""
+
+# Start Fail2Ban in foreground mode
+# -f: foreground
+# -x: force execution of the server (skip PID check)
+# -v: verbose
 exec fail2ban-server -f -x -v start

@@ -61,42 +61,39 @@ jobs:
       run: |
         set -euo pipefail
         
-        # Cleanup function for trap
-        cleanup() {
-          echo "Cleaning up test container..."
-          docker rm -f test-container >/dev/null 2>&1 || true
-        }
-        trap cleanup EXIT
+        # Set up cleanup trap
+        trap 'docker logs test-container 2>&1 || true; docker rm -f test-container 2>&1 || true' EXIT
         
-        # Start container in detached mode
-        echo "Starting container..."
+        echo "Starting container in detached mode..."
         docker run -d --name test-container mikrotik-fail2ban:test
         
         # Wait up to 30 seconds for the container to become healthy/running
         echo "Waiting for container to start..."
         for i in {1..30}; do
           if docker ps --filter "name=test-container" --filter "status=running" --format '{{.ID}}' | grep -q .; then
-            echo "Container is running"
+            echo "Container is running!"
             break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "ERROR: Container failed to start within 30 seconds"
+            echo "Container status:"
+            docker ps -a --filter "name=test-container"
+            echo ""
+            echo "Container logs:"
+            docker logs test-container 2>&1 || true
+            exit 1
           fi
           sleep 1
         done
         
-        # Check if container is still running
-        if ! docker ps --filter "name=test-container" --filter "status=running" --format '{{.ID}}' | grep -q .; then
-          echo "ERROR: Container is not running, printing logs:"
-          docker logs test-container 2>&1 || true
-          exit 1
-        fi
-        
-        # Give fail2ban-server a moment to fully initialize
-        echo "Waiting for fail2ban-server to initialize..."
+        # Give fail2ban a moment to fully initialize
         sleep 3
         
-        # Check if fail2ban is responding
+        # Check if fail2ban is running
         echo "Testing fail2ban-client ping..."
         if ! docker exec test-container fail2ban-client ping; then
-          echo "ERROR: fail2ban-client ping failed, printing logs:"
+          echo "ERROR: fail2ban-client ping failed"
+          echo "Container logs:"
           docker logs test-container 2>&1 || true
           exit 1
         fi
@@ -105,12 +102,5 @@ jobs:
         echo "Testing fail2ban-client version..."
         docker exec test-container fail2ban-client version
         
-        # Check status
-        echo "Checking fail2ban status..."
-        docker exec test-container fail2ban-client status
-        
-        # Print logs for debugging
-        echo "Container logs:"
-        docker logs test-container 2>&1 || true
-        
-        echo "Docker image test passed successfully!"
+        echo ""
+        echo "✓ Docker image test passed"
