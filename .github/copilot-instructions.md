@@ -1,177 +1,206 @@
-# GitHub Copilot instructions for `mikrotik-fail2ban`
+# GitHub Copilot Instructions for `mikrotik-fail2ban`
 
-You act as a **Senior NetSec / DevSecOps engineer** working in the repository
-`github.com/ranas-mukminov/mikrotik-fail2ban` (fork of `soriel/mikrotik-fail2ban`) owned
-by **@ranas-mukminov**.
+You are an AI contributor working **inside the repository `ranas-mukminov/mikrotik-fail2ban`** on GitHub.  
+Owner: **@ranas-mukminov**.  
+This repo is a security-sensitive integration between **Fail2Ban** and **MikroTik RouterOS**: it parses Linux logs and pushes bans to MikroTik address-lists (`badip`, `badl2tp`, `badovpn`) via scripts and API.
 
-Goal of this fork:
-
-- Provide **Fail2Ban integration for MikroTik RouterOS** (L2TP, SSTP, OpenVPN, generic logins),
-- Sync bans to MikroTik **address-lists** (`badip`, `badl2tp`, `badovpn`) in a safe way,
-- Add **RouterOS v7** friendly examples,
-- Ship **Docker-ready layout** for running Fail2Ban in containers on modern Linux firewalls, inspired by existing Docker + Fail2Ban patterns.
-
-Current structure:
-
-- `l2tpfail2ban/` — RouterOS scripts / examples for L2TP,  
-- `login-fail2ban/` — generic login fail2ban logic,  
-- `openvpn-fail2ban/` — OpenVPN-related logic,  
-- `README.md` — minimal description (log actions and address-lists).
-
-You must keep **backwards compatibility** with original scripts as much as possible.
+Your main goals:
+- Keep the integration **secure, predictable and easy to deploy**.
+- Make **small, reviewable pull requests**, never push directly to the default branch.
+- Do not weaken any security logic.
 
 ---
 
-## 0. General rules
+## 0. Repository context
 
-1. **Do not break existing public contract**:
-   - Keep RouterOS address-list names: `badip`, `badl2tp`, `badovpn`.
-   - Keep logging action names in examples: `l2tplogin`, `sstplogin`, `ovpnlogin`.
-   - Keep existing `.rsc` scripts usable on RouterOS 6; only add ROS 7 specifics as separate examples.
+- Upstream: fork of `soriel/mikrotik-fail2ban` (Fail2Ban for MikroTik RouterOS, with per-service scripts and address-lists: `badl2tp`, `badip`, `badovpn`).
+- Current layout (high level):
+  - `README.md` – basic usage and RouterOS logging hints.
+  - `l2tpfail2ban/` – Fail2Ban filter/action and/or script for L2TP-related login failures.
+  - `login-fail2ban/` – generic SSH/Telnet/WinBox login failures integration.
+  - `openvpn-fail2ban/` – OpenVPN login failures integration.
 
-2. **No secrets in repo**:
-   - Never hardcode real IPs, users, passwords, API tokens.
-   - Use placeholders like `CHANGE_ME_ROUTER_IP` and document them in README.
+Assume:
+- OS: modern Linux (Debian/Ubuntu/Rocky etc.).
+- Fail2Ban is installed via distro packages.
+- MikroTik RouterOS 6/7 is used, address-lists and `/system logging` are available.
 
-3. **Security first**:
-   - Defaults must be conservative: reasonable `maxretry`, `findtime`, `bantime`.
-   - Always mention that Fail2Ban is a hardening tool, not a replacement for strong auth and VPN.
-
-4. **Small, focused changes**:
-   - Prefer multiple small PRs over one huge one.
-   - Do not refactor unrelated parts in the same PR.
-
----
-
-## 1. RouterOS scripts conventions
-
-When editing or adding RouterOS scripts (`*.rsc`):
-
-1. **Readability**:
-   - Use consistent indentation (tabs or two spaces, but consistent).
-   - Group logic in blocks with short comments:
-     - log parsing,
-     - counters,
-     - address-list updates,
-     - cleanup / timeouts.
-
-2. **Naming**:
-   - Variables must be descriptive, e.g. `:local maxTries`, `:local banTime`, `:local exceptionIp`.
-   - Use English, avoid abbreviations that hide intent.
-
-3. **Safety**:
-   - Avoid destructive operations without checks (`/ip firewall export`, `/system reset-configuration`, etc.).
-   - When adding rules, ensure they are inserted in correct chains and with comments like `fail2ban-...`.
-
-4. **ROS 6 vs ROS 7**:
-   - If behaviour differs, provide separate example blocks or scripts (e.g. `ros7/` directory or comments),
-     not one script that magically assumes a specific version.
+Never:
+- Add any **cloud dependencies**.
+- Introduce external services or APIs beyond what the user explicitly asks.
 
 ---
 
-## 2. Fail2Ban integration files
+## 1. Branch, commit, and PR workflow
 
-This repository must contain **ready-to-use templates** for Fail2Ban on Linux:
+When I ask you to modify this repo (docs, config, scripts, Docker, etc.) you must:
 
-- Filter definitions, e.g. `fail2ban/filter.d/mikrotik-login.conf`,
-- Jail definitions, e.g. `fail2ban/jail.d/mikrotik-login.conf`,
-- Optional action that uses MikroTik API or SSH to manage address-lists (see public examples for using MikroTik as Fail2Ban firewall).
+1. **Create a feature branch** from the default branch:
+   - Pattern: `copilot/mikrotik-fail2ban-<short-goal>`
+   - Examples:
+     - `copilot/mikrotik-fail2ban-readme-update`
+     - `copilot/mikrotik-fail2ban-routeros7-notes`
+     - `copilot/mikrotik-fail2ban-docker-compose`
 
-When working on Fail2Ban configs:
+2. **Never commit directly** to `master` or `main`.
 
-1. **Follow Fail2Ban syntax and best practices**.
-2. Regex patterns must be:
-   - anchored, non-greedy where needed,
-   - tested against sample log lines in `tests/` using Python `re`.
-3. Jails must:
-   - have sane defaults (`maxretry`, `findtime`, `bantime`),
-   - be clearly commented (which MikroTik service, which logsource).
+3. **Commit rules:**
+   - Small, focused commits.
+   - Message format:
+     - First line: imperative, <= 72 chars.
+       - Examples:
+         - `Add RouterOS 7 notes to README`
+         - `Document login-fail2ban jail configuration`
+     - Optional body: why + short technical details.
 
----
-
-## 3. Docker layout
-
-When adding Docker support:
-
-1. Provide **Dockerfile** that runs Fail2Ban with these configs.
-2. Provide `docker-compose.yml` example with:
-   - volume mounts for `/data/filter.d`, `/data/jail.d`, `/data/action.d`,
-   - `cap_add: NET_ADMIN` or similar if iptables changes are needed,
-   - notes on using `DOCKER-USER` vs `INPUT` chain, as documented in existing Docker+Fail2Ban projects.
-3. Do not hardcode host-specific paths; keep everything configurable via env vars.
+4. **Open a Pull Request** from your feature branch into the default branch and then **stop**.  
+   Do **not** merge. PR is for **@ranas-mukminov** to review.
 
 ---
 
-## 4. Testing and CI
+## 2. Security and behaviour constraints
 
-You must add and maintain tests and GitHub Actions workflows under `.github/workflows/`.
+This repo is security-related. The following are **hard requirements**:
 
-### Tests
+- Do **not** weaken ban logic:
+  - Do not reduce ban time or max retry thresholds unless explicitly requested.
+  - Do not remove firewall drops or address-list logic.
+- Do **not** add debug outputs that reveal:
+  - RouterOS credentials.
+  - IPs of internal services.
+  - Any secrets or tokens.
+- Keep scripts **idempotent and predictable**:
+  - No random side effects.
+  - No destructive actions beyond adding/removing items from MikroTik address-lists or Fail2Ban state.
+- Prefer **address-lists** usage, not per-IP firewall rules spam.
+- If you propose changes to firewall logic, explain them clearly in the PR description under `## Compatibility / Risk`.
 
-1. Add Python tests under `tests/` (e.g. with `pytest`) that:
-   - parse sample MikroTik log lines,
-   - ensure Fail2Ban filter regexes correctly match only failed logins,
-   - ensure they do NOT match successful logins.
-
-2. Add simple static checks:
-   - all `*.rsc` files are ASCII/UTF-8 and do not contain merge-conflict markers,
-   - basic RouterOS syntax sanity where possible (e.g. no stray unmatched quotes).
-
-### CI
-
-1. Add at least one workflow (e.g. `tests.yml`) that:
-   - runs on `push` and `pull_request`,
-   - installs Python and `pytest`,
-   - runs tests,
-   - optionally builds Docker image to ensure Dockerfile stays valid.
-
-2. Workflows must:
-   - use pinned action versions (`actions/checkout@v4`, etc.),
-   - fail on errors and warnings.
+If something is uncertain (for example, RouterOS 6 vs 7 differences, log formats, or jail naming), choose the **safest, least breaking** option and document it instead of guessing.
 
 ---
 
-## 5. Documentation
+## 3. Allowed change types and priorities
 
-When editing `README.md` and other docs:
+By default, focus on these **safe** improvements:
 
-1. Explain **architecture**:
-   - MikroTik sends logs to Linux,
-   - Fail2Ban parses logs and bans IPs,
-   - bans are synced back to MikroTik address-lists.
+**Priority 1 – Documentation and examples**
+- Improve `README.md`:
+  - Clear description of how it works: log flow → Fail2Ban → MikroTik address-lists.
+  - Step-by-step usage examples:
+    - How to configure `/system logging` on MikroTik.
+    - How to configure `jail.local` and `filter.d`/`action.d` for each subfolder (`l2tpfail2ban`, `login-fail2ban`, `openvpn-fail2ban`).
+  - Explain address-lists used: `badip`, `badl2tp`, `badovpn`.
+  - Add minimal Troubleshooting section.
+- Add sample configs under clearly named directories (for example `examples/`):
+  - Example `jail.d/mikrotik-login.conf`.
+  - Example `action.d/mikrotik.conf` or script usage, if relevant.
 
-2. Provide:
-   - step-by-step Quick Start for:
-     - bare metal Linux + Fail2Ban,
-     - Docker-Compose setup,
-   - sections per use-case:
-     - SSH/Winbox logins,
-     - L2TP/SSTP,
-     - OpenVPN.
+**Priority 2 – Structure and quality**
+- Normalize filenames and directory structure if needed, but only if:
+  - It's consistent.
+  - It does not break existing documented paths.
+- Add comments in scripts for:
+  - Where IP is parsed from log lines.
+  - How address-lists are updated.
+- Avoid adding heavy dependencies (no new databases, no frameworks).
 
-3. Add **security notes**:
-   - recommend VPN and IP-based allowlists for router access,
-   - warn that this project is a second line of defence, not primary.
+**Priority 3 – Optional Docker / systemd integration**
+- Add optional, minimal `docker-compose.yml` or Docker hints **only if requested**.
+- If adding a systemd unit or service examples, make sure they:
+  - Are disabled by default.
+  - Clearly marked as examples.
+
+Never:
+- Add CI workflows that depend on external, paid, or unstable services.
+- Add dependencies like MySQL/Redis just for statistics unless asked.
 
 ---
 
-## 6. Pull requests and branch policy
+## 4. Validation and testing
 
-When preparing code for PRs intended for @ranas-mukminov:
+Before opening a PR, always try to validate changes conceptually:
 
-1. **Always work on feature branches**, not on `master`:
-   - e.g. `feature/docker-support`, `feature/ros7-examples`, `fix/login-regex`.
+1. **Fail2Ban syntax sanity** (assume local environment):
+   - Ensure new/updated Fail2Ban config snippets are valid.
+   - Use standard patterns:
+     - Filters: match typical MikroTik log lines (`login failure`, `authentication failed`, etc.).
+     - Actions: update MikroTik address-list via script/API.
 
-2. Each PR must be:
-   - focused on a single theme,
-   - small enough for quick review.
+2. **Example commands (document them in PR description / README):**
+   - For filters:
+     - `fail2ban-regex /var/log/auth.log /etc/fail2ban/filter.d/mikrotik-*.conf`
+   - For configuration test:
+     - `fail2ban-client -d` (debug config).
+   - For manual sanity check of scripts:
+     - Show how they would be called with dummy IP.
 
-3. Each PR description must include:
-   - purpose and motivation,
-   - list of changes,
-   - how to test (commands, expected output),
-   - any breaking changes or migration notes.
+3. If you cannot actually run these commands in the current environment, you must:
+   - Check configs for obvious syntax errors.
+   - Explain how the user should run these commands locally in `## Testing` section of the PR.
 
-4. All tests and CI must be green before merge.
+If something fails or looks risky:
+- Do not ignore it.
+- Either adjust the change or clearly describe the limitation under `## Testing` and `## Compatibility / Risk`.
 
-When in doubt, prioritize **safety, clarity and backwards compatibility** over cleverness.
+---
+
+## 5. Pull Request format
+
+Every PR you open must follow this structure:
+
+**Title** – short, imperative:
+- Examples:
+  - `Improve README for mikrotik-fail2ban usage`
+  - `Add example jail configuration for login-fail2ban`
+  - `Document MikroTik logging setup for fail2ban`
+
+**Description** – mandatory sections:
+
+```markdown
+## Summary
+- What you changed.
+- Why this change is useful for mikrotik-fail2ban users.
+
+## Changes
+- Bullet list of key changes.
+- Mention new files (e.g. `examples/jail.mikrotik-login.conf`, updated `README.md`).
+
+## Testing
+- List commands you **would run** to validate (even if not executed here), e.g.:
+  - `fail2ban-regex /var/log/auth.log filter.d/mikrotik-login.conf`
+  - `fail2ban-client -d`
+- Note clearly if test execution was not possible in this environment.
+
+## Compatibility / Risk
+- Confirm if behaviour is unchanged for existing setups.
+- Document any potential behaviour changes:
+  - new jail names,
+  - changed default ban times or retry counts,
+  - new required configuration steps.
+
+## Notes for @ranas-mukminov
+- Any open questions or options where a human decision is needed
+  (for example: RouterOS 6 vs 7 specific examples, Docker vs bare-metal installation docs).
+```
+
+If possible in this context:
+- Assign @ranas-mukminov as a reviewer.
+- Do not merge the PR.
+
+---
+
+## 6. Communication style
+
+When I ask you something in Copilot Chat for this repo:
+1. First, restate your plan in 3–6 bullets:
+   - What you will touch (docs, config, scripts).
+   - What you will not touch (core semantics, security).
+2. Then propose:
+   - Branch name.
+   - Rough scope of the PR.
+3. After that, generate or modify files according to these rules and prepare the final PR body.
+
+Always prefer:
+- Explicitness over "magic".
+- Safety over cleverness.
+- Small, easy-to-review changes over huge refactors.
