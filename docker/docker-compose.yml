@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  fail2ban:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: mikrotik-fail2ban:latest
+    container_name: mikrotik-fail2ban
+    
+    # Required for iptables manipulation
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    
+    # Use host network to apply iptables rules to host
+    # Alternatively, use bridge network if you want to isolate
+    network_mode: host
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Mount volumes for custom configurations
+    volumes:
+      # Custom filter, jail, and action configurations
+      # Place your customized .conf files here to override defaults
+      - ./data/filter.d:/data/filter.d:ro
+      - ./data/jail.d:/data/jail.d:ro
+      - ./data/action.d:/data/action.d:ro
+      
+      # Log files - mount your system logs or use syslog
+      # Adjust these paths based on your host system
+      - /var/log:/var/log:ro
+      
+      # Fail2Ban database to persist bans across restarts
+      - fail2ban-db:/var/lib/fail2ban
+    
+    # Environment variables (optional)
+    environment:
+      # Set timezone if needed
+      - TZ=UTC
+    
+    # Port mappings (only needed if not using host network)
+    # Uncomment these if you switch to bridge network
+    # ports:
+    #   - "514:514/tcp"   # Syslog TCP
+    #   - "514:514/udp"   # Syslog UDP
+
+volumes:
+  fail2ban-db:
+    driver: local
+
+# Notes:
+# 
+# 1. DOCKER-USER chain vs INPUT chain:
+#    - Fail2Ban typically adds rules to the INPUT chain
+#    - For Docker host protection, ensure rules are in INPUT or DOCKER-USER
+#    - With network_mode: host, INPUT chain rules work as expected
+#    - Without host network, you may need custom actions targeting DOCKER-USER
+#
+# 2. MikroTik Configuration:
+#    Configure your MikroTik router to send logs to this container:
+#    /system logging action add name=remote target=remote remote=YOUR_DOCKER_HOST_IP remote-port=514
+#    /system logging add topics=system,info,error action=remote
+#
+# 3. Custom Configurations:
+#    - Create ./data/filter.d/ with custom *.conf files to override filters
+#    - Create ./data/jail.d/ with custom *.conf files to override jails
+#    - Create ./data/action.d/ with custom *.conf files for MikroTik API actions
+#
+# 4. Testing:
+#    - Build: docker-compose build
+#    - Start: docker-compose up -d
+#    - Logs: docker-compose logs -f
+#    - Status: docker-compose exec fail2ban fail2ban-client status
+#
+# 5. Security:
+#    - Never expose port 514 to the internet without proper firewall rules
+#    - Use encrypted syslog (TLS) in production if possible
+#    - Consider using a dedicated network for log collection
