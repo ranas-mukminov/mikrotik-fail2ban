@@ -217,6 +217,34 @@ Tests verify that:
 docker build -f docker/Dockerfile -t mikrotik-fail2ban:latest .
 ```
 
+### Testing the Image
+
+After building, you can test the image to ensure fail2ban-server is running properly:
+
+```bash
+# Start the container
+docker run -d --name test-container mikrotik-fail2ban:latest
+
+# Wait a few seconds for startup
+sleep 5
+
+# Test that fail2ban is running
+docker exec test-container fail2ban-client ping
+# Expected output: Server replied: pong
+
+# Check the version
+docker exec test-container fail2ban-client version
+
+# Check status
+docker exec test-container fail2ban-client status
+
+# View logs
+docker logs test-container
+
+# Clean up
+docker rm -f test-container
+```
+
 ### Environment Variables
 
 - `TZ` - Timezone (default: UTC)
