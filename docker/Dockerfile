@@ -34,3 +34,4 @@ VOLUME ["/data"]
 EXPOSE 514/tcp 514/udp
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD []
