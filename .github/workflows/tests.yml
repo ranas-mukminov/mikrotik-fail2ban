@@ -59,20 +59,48 @@ jobs:
     
     - name: Test Docker image
       run: |
-        # Start container in detached mode
+        set -euo pipefail
+        
+        # Set up cleanup trap
+        trap 'docker logs test-container 2>&1 || true; docker rm -f test-container 2>&1 || true' EXIT
+        
+        echo "Starting container in detached mode..."
         docker run -d --name test-container mikrotik-fail2ban:test
         
-        # Wait a few seconds for startup
-        sleep 5
+        # Wait up to 30 seconds for the container to become healthy/running
+        echo "Waiting for container to start..."
+        for i in {1..30}; do
+          if docker ps --filter "name=test-container" --filter "status=running" --format '{{.ID}}' | grep -q .; then
+            echo "Container is running!"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "ERROR: Container failed to start within 30 seconds"
+            echo "Container status:"
+            docker ps -a --filter "name=test-container"
+            echo ""
+            echo "Container logs:"
+            docker logs test-container 2>&1 || true
+            exit 1
+          fi
+          sleep 1
+        done
+        
+        # Give fail2ban a moment to fully initialize
+        sleep 3
         
         # Check if fail2ban is running
-        docker exec test-container fail2ban-client ping || exit 1
+        echo "Testing fail2ban-client ping..."
+        if ! docker exec test-container fail2ban-client ping; then
+          echo "ERROR: fail2ban-client ping failed"
+          echo "Container logs:"
+          docker logs test-container 2>&1 || true
+          exit 1
+        fi
         
         # Check version
+        echo "Testing fail2ban-client version..."
         docker exec test-container fail2ban-client version
         
-        # Clean up
-        docker stop test-container
-        docker rm test-container
-        
-        echo "Docker image test passed"
+        echo ""
+        echo "✓ Docker image test passed"

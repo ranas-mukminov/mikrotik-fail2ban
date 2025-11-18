@@ -194,6 +194,8 @@ Adjust these values in the jail configuration files based on your security requi
 
 ## Testing
 
+### Filter Tests
+
 Run the automated tests to verify filter regex patterns:
 
 ```bash
@@ -208,6 +210,38 @@ Tests verify that:
 - Failed login attempts are correctly matched
 - Successful logins are NOT matched
 - All filter regex patterns are valid
+
+### Docker Image Testing
+
+Test the Docker image locally before deployment:
+
+```bash
+# Build the image
+docker build -f docker/Dockerfile -t mikrotik-fail2ban:test .
+
+# Run the container
+docker run -d --name test-container mikrotik-fail2ban:test
+
+# Wait a few seconds for initialization
+sleep 5
+
+# Test fail2ban-client commands
+docker exec test-container fail2ban-client ping
+docker exec test-container fail2ban-client version
+docker exec test-container fail2ban-client status
+
+# Check logs
+docker logs test-container
+
+# Clean up
+docker stop test-container
+docker rm test-container
+```
+
+The container should:
+- Start successfully and stay running
+- Respond to `fail2ban-client ping` with "Server replied: pong"
+- Show fail2ban version and status
 
 ## Docker Details
 

@@ -20,33 +20,12 @@ RUN mkdir -p /data/filter.d /data/jail.d /data/action.d
 COPY fail2ban/filter.d/*.conf /etc/fail2ban/filter.d/
 COPY fail2ban/jail.d/*.conf /etc/fail2ban/jail.d/
 
-# Create a startup script
-RUN echo '#!/bin/bash\n\
-set -e\n\
-\n\
-# Copy custom configurations if provided\n\
-if [ -d /data/filter.d ] && [ "$(ls -A /data/filter.d)" ]; then\n\
-    echo "Copying custom filters from /data/filter.d..."\n\
-    cp -v /data/filter.d/*.conf /etc/fail2ban/filter.d/ || true\n\
-fi\n\
-\n\
-if [ -d /data/jail.d ] && [ "$(ls -A /data/jail.d)" ]; then\n\
-    echo "Copying custom jails from /data/jail.d..."\n\
-    cp -v /data/jail.d/*.conf /etc/fail2ban/jail.d/ || true\n\
-fi\n\
-\n\
-if [ -d /data/action.d ] && [ "$(ls -A /data/action.d)" ]; then\n\
-    echo "Copying custom actions from /data/action.d..."\n\
-    cp -v /data/action.d/*.conf /etc/fail2ban/action.d/ || true\n\
-fi\n\
-\n\
-# Start rsyslog for log collection\n\
-rsyslogd\n\
-\n\
-# Start Fail2Ban in foreground\n\
-exec fail2ban-server -f -x -v start\n\
-' > /usr/local/bin/docker-entrypoint.sh && \
-    chmod +x /usr/local/bin/docker-entrypoint.sh
+# Copy jail.local to disable default Debian jails
+COPY docker/jail.local /etc/fail2ban/jail.local
+
+# Copy and set up entrypoint script
+COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Expose volume for custom configurations
 VOLUME ["/data"]
