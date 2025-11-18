@@ -27,8 +27,12 @@ mkdir -p /var/run/fail2ban /var/log
 touch /var/log/auth.log /var/log/syslog /var/log/messages
 
 # Start rsyslog for log collection (suppress kernel log warnings)
+# Note: rsyslogd may fail in some container environments (e.g., restricted capabilities)
+# This is acceptable as fail2ban can work without it if logs are provided externally
 echo "Starting rsyslog..."
-rsyslogd 2>/dev/null || true
+if ! rsyslogd 2>/dev/null; then
+    echo "Warning: rsyslogd failed to start (this is OK if logs are provided externally)"
+fi
 
 echo "Starting fail2ban-server in foreground..."
 echo "Fail2Ban will monitor MikroTik logs configured in /etc/fail2ban/jail.d/"
