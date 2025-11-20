@@ -129,6 +129,31 @@ class TestMikroTikL2TPFilter:
     def patterns(self):
         return load_filter_regex("mikrotik-l2tp.conf")
     
+    def test_first_pattern_matches(self, patterns):
+        """Test that the first combined (l2tp|sstp) pattern works correctly"""
+        # This test specifically validates the first failregex pattern
+        # which should match both l2tp and sstp with a single regex
+        if len(patterns) < 1:
+            pytest.skip("No patterns found")
+        
+        first_pattern = patterns[0]
+        
+        # Test L2TP logs
+        l2tp_logs = [
+            "Jan 10 12:34:56 mikrotik l2tp,ppp,info <192.168.1.100>: sent CHAP Failure id=0x5",
+            "l2tp,ppp,info <10.0.0.50>: sent CHAP Failure id=0x3",
+        ]
+        for log_line in l2tp_logs:
+            assert first_pattern.search(log_line), f"First pattern should match L2TP: {log_line}"
+        
+        # Test SSTP logs
+        sstp_logs = [
+            "Jan 10 12:34:56 mikrotik sstp,ppp,info <192.168.1.100>: sent CHAP Failure id=0x5",
+            "sstp,ppp,info <10.0.0.50>: sent CHAP Failure id=0x3",
+        ]
+        for log_line in sstp_logs:
+            assert first_pattern.search(log_line), f"First pattern should match SSTP: {log_line}"
+    
     def test_failed_l2tp_login(self, patterns):
         """Test that failed L2TP login attempts are matched"""
         log_lines = [
